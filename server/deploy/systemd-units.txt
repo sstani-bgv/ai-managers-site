@@ -1,0 +1,42 @@
+# /etc/systemd/system/bugaev-leads.service
+[Unit]
+Description=Заявки с bugaev-ai.ru
+After=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/bugaev-leads/app.py
+DynamicUser=yes
+StateDirectory=bugaev-leads
+LoadCredential=env:/etc/bugaev-leads/env
+Restart=always
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
+
+# /etc/systemd/system/bugaev-leads.service.d/model.conf
+[Service]
+Environment=YC_CHAT_MODEL=aliceai-llm/latest
+
+# /etc/systemd/system/bugaev-voice.service
+[Unit]
+Description=Голосовое демо bugaev-ai.ru (релей к Yandex Realtime API)
+After=network-online.target
+
+[Service]
+WorkingDirectory=/opt/bugaev-leads
+ExecStart=/usr/bin/python3 /opt/bugaev-leads/voice.py
+DynamicUser=yes
+StateDirectory=bugaev-voice
+LoadCredential=env:/etc/bugaev-leads/env
+Restart=always
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

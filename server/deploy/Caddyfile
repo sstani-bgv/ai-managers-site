@@ -1,0 +1,14 @@
+bugaev-ai.ru {
+	root * /var/www/bugaev-ai.ru
+	encode zstd gzip
+	header /fonts/* Cache-Control "public, max-age=31536000, immutable"
+	handle /api/voice {
+		reverse_proxy 127.0.0.1:8082
+	}
+	handle /api/* {
+		reverse_proxy 127.0.0.1:8081
+	}
+	handle {
+		file_server
+	}
+}

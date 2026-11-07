@@ -1,0 +1,938 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ИИ-менеджер для бизнеса — Станислав Бугаев</title>
+<meta name="description" content="ИИ-менеджер отвечает клиентам за минуту, даже ночью и в выходные. Бесплатный разбор: посчитаем, сколько заявок вы теряете.">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="icon" href="favicon.ico" sizes="32x32">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preload" href="fonts/onest-cyrillic.woff2" as="font" type="font/woff2" crossorigin>
+<style>
+@font-face{font-family:Onest;src:url(fonts/onest-cyrillic.woff2) format("woff2");font-weight:100 900;font-display:swap;unicode-range:U+0301,U+0400-045F,U+0490-0491,U+04B0-04B1,U+2116}
+@font-face{font-family:Onest;src:url(fonts/onest-latin.woff2) format("woff2");font-weight:100 900;font-display:swap;unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:Onest;src:url(fonts/onest-latin-ext.woff2) format("woff2");font-weight:100 900;font-display:swap;unicode-range:U+20BD}
+@property --fill{syntax:"<percentage>";inherits:false;initial-value:0%}
+
+/* Мир: линия маршрута. Белые таблички, чёрная краска, стальная полоса,
+   один цвет линии на нишу — только в полную силу. */
+:root{
+  --paper:#FFFFFF;--steel:#EEF0F2;--rule:#D3D8DE;--field:#8A929E;
+  --ink:#14181F;--ink-2:#3F4752;--ink-3:#5B6470;
+  --line:#0A7B47;--line-hover:color-mix(in srgb,var(--line) 80%,#000);
+  --loss:#B42318;
+  --board:#14181F;--board-2:#232934;--board-edge:#6B7480;--board-text:#F3F5F7;--board-muted:#B4BBC5;--board-loss:#FF8B7B;--board-gain:#7EDCA6;
+  --r:6px;--rail:18px;
+}
+html[data-n=school]{--line:#0B55B0}
+html[data-n=opt]{--line:#8A4B16}
+html[data-n=clinic]{--line:#00767A}
+
+*{box-sizing:border-box}
+html{scroll-padding-top:80px;-webkit-text-size-adjust:100%} /* 80 = шапка 65 + зазор: якорный блок встаёт под шапкой */
+@media(prefers-reduced-motion:no-preference){html.ready{scroll-behavior:smooth}} /* плавно — только после загрузки: прямая ссылка с #якорем открывается сразу на месте */
+body{margin:0;background:var(--paper);color:var(--ink);font:400 18px/1.55 Onest,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+::selection{background:var(--line);color:#fff}
+h1,h2,h3,p,figure{margin:0}
+h1,h2,h3{text-wrap:balance}
+p,li{text-wrap:pretty}
+h2{font-size:clamp(30px,3.6vw,50px);line-height:1.06;letter-spacing:-.03em;font-weight:800;margin-bottom:28px;max-width:20ch}
+h3{font-size:clamp(20px,1.6vw,22px);line-height:1.3;font-weight:700;letter-spacing:-.01em;margin-bottom:8px}
+a{color:inherit;text-underline-offset:.18em;text-decoration-thickness:1px}
+a:hover{text-decoration-thickness:2px}
+input,button{font-family:inherit;caret-color:var(--line)}
+.wrap{max-width:1240px;margin:0 auto;padding:0 16px}
+.s{padding:64px 0}
+.s.flush{padding-top:0}
+.muted{color:var(--ink-2)}
+.small{font-size:15px;line-height:1.45;color:var(--ink-3)}
+@media(min-width:760px){.wrap{padding:0 40px}.s{padding:104px 0}}
+
+/* пиктограммы: штрих, без плашек */
+.ico{display:inline-grid;place-items:center;flex:none;width:24px;height:24px;color:inherit}
+.ico svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.ico.lg{width:36px;height:36px}
+.ico.sm{width:22px;height:22px}.ico.sm svg{stroke-width:2.4}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:10px;min-height:56px;padding:0 26px;border:0;border-radius:var(--r);background:var(--line);color:#fff;font-weight:600;font-size:18px;line-height:1.2;text-decoration:none;cursor:pointer;text-align:center;transition:background-color .15s}
+.btn:hover{background:var(--line-hover)}
+.btn.ghost{background:transparent;color:var(--ink);box-shadow:inset 0 0 0 2px var(--ink)}
+.btn.ghost:hover{background:var(--steel)}
+.btn[disabled]{opacity:.6;cursor:wait}
+:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+
+/* шапка */
+.top{position:sticky;top:0;z-index:10;background:var(--paper);border-bottom:1px solid var(--rule)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:64px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:18px;letter-spacing:-.01em;white-space:nowrap}
+.brand svg{width:28px;height:28px;flex:none;color:var(--line)}
+.top .btn{min-height:44px;padding:0 18px;font-size:16px;white-space:nowrap}
+@media(max-width:420px){.brand{font-size:16px;gap:9px;white-space:normal;line-height:1.1}.brand svg{width:30px;height:30px}.top .btn{padding:0 14px;font-size:15px}}
+@media(max-width:374px){.top .wrap{gap:8px}.brand{font-size:15px}.top .btn{padding:0 12px}}
+
+/* первый экран */
+.hero{padding:28px 0 64px}
+.hero h1{font-size:clamp(34px,5.2vw,76px);line-height:1.02;letter-spacing:-.035em;font-weight:800;max-width:21ch;margin-bottom:24px}
+.lead{font-size:clamp(19px,1.5vw,22px);line-height:1.5;color:var(--ink-2);max-width:40ch;margin-bottom:28px}
+.ctas{display:flex;flex-wrap:wrap;gap:12px;margin-bottom:14px}
+.ctas .btn{flex:1 1 100%}
+@media(min-width:600px){.ctas .btn{flex:0 0 auto}}
+.hero-copy{margin-bottom:44px}
+@media(min-width:1000px){
+  .hero{padding:64px 0 112px}
+  .hero-grid{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);column-gap:64px}
+  .hero h1{grid-column:1/-1;margin-bottom:48px}
+  .hero-copy{position:sticky;top:104px;align-self:start;margin:0}
+  .ctas{flex-direction:column;max-width:420px}
+  .ctas .btn{flex:none}
+}
+
+/* маршрут заявки: рельс, станции, диалог на линии */
+.stop{position:relative;display:grid;grid-template-columns:var(--rail) minmax(0,1fr);align-content:start;column-gap:16px;row-gap:12px;padding-bottom:28px}
+.stop:last-child{padding-bottom:0;min-height:170px}
+.stop::before{content:"";position:absolute;z-index:1;left:0;top:5px;width:18px;height:18px;border-radius:50%;background:var(--paper);box-shadow:inset 0 0 0 3px var(--rule);transition:background-color .3s,box-shadow .3s}
+.stop::after{content:"";position:absolute;left:7.5px;top:14px;bottom:-14px;width:3px;background:linear-gradient(var(--line),var(--line)) top/100% var(--fill) no-repeat,var(--rule);transition:--fill 1.2s cubic-bezier(.16,1,.3,1)}
+.stop:last-child::after{display:none}
+.stop>*{grid-column:2;min-width:0;align-self:start}
+.st{display:flex;align-items:center;gap:8px;min-height:28px;color:var(--ink-3);transition:color .3s}
+.st .ico{width:22px;height:22px}
+.st b{font-size:17px;font-weight:700}
+.st small{font-size:16px;font-weight:600;font-variant-numeric:tabular-nums}
+.st small::before{content:"·";margin-right:8px;font-weight:400}
+#flow:has(.msg) .stop:nth-child(1)::after,.stop:has(.msg.a)::after{--fill:100%}
+#flow:has(.msg) .stop:nth-child(1)::before,.stop:has(.msg.a)::before,.stop:has(.res:not([hidden]))::before{background:var(--line);box-shadow:inset 0 0 0 3px var(--line)}
+#flow:has(.msg) .stop:nth-child(1) .st,.stop:has(.msg.a) .st,.stop:has(.res:not([hidden])) .st{color:var(--ink)}
+#flow:has(.msg) .stop:nth-child(1) .st .ico,.stop:has(.msg.a) .st .ico,.stop:has(.res:not([hidden])) .st .ico{color:var(--line)}
+@media(min-width:1000px){
+  .stop{grid-template-columns:var(--rail) 118px minmax(0,1fr);padding-bottom:36px}
+  .stop:last-child{min-height:130px}
+  .stop>*{grid-column:3;grid-row:1}
+  .stop>.st{grid-column:2;flex-direction:column;align-items:flex-start;gap:0;margin-top:1px}
+  .st .ico{display:none}
+  .st b{font-size:15px;font-weight:600}
+  .st small{font-size:26px;font-weight:800;letter-spacing:-.02em;line-height:1.1}
+  .st small::before{content:none}
+}
+.chat-head{display:flex;flex-direction:column;font-weight:700;font-size:17px;line-height:1.35;padding-top:2px}
+.chat-head small{font-weight:400;font-size:15px;color:var(--ink-3)}
+.chat-body{display:flex;flex-direction:column;gap:8px;min-height:400px}
+@media(min-width:1000px){.chat-body{min-height:340px}}
+.msg,.pre{max-width:88%;padding:10px 14px;border-radius:14px;font-size:16px;line-height:1.45;animation:pop .4s cubic-bezier(.16,1,.3,1)}
+.pre,.res[hidden]{visibility:hidden;animation:none} /* ещё не показанные сообщения и итог уже занимают своё место: первый экран не растёт */
+.res[hidden]{display:block}
+.msg.c{align-self:flex-start;background:var(--steel);color:var(--ink);border-bottom-left-radius:4px}
+.msg.a{align-self:flex-end;background:var(--line);color:#fff;border-bottom-right-radius:4px}
+.res{padding:16px 18px;border:2px solid var(--line);border-radius:var(--r);background:var(--paper);animation:pop .4s cubic-bezier(.16,1,.3,1)}
+.res b{display:flex;gap:10px;align-items:center;font-size:17px}
+.res .ico{color:var(--line)}
+.res ul{margin:8px 0 0;padding-left:20px;font-size:15px;color:var(--ink-2)}
+.chat-meta{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:4px 16px;margin-top:12px;padding-left:calc(var(--rail) + 16px);font-size:14px;color:var(--ink-3)}
+@media(min-width:1000px){.chat-meta{padding-left:calc(var(--rail) + 150px)}}
+.linkbtn{min-height:44px;background:none;border:0;padding:0 2px;font:inherit;font-weight:600;color:var(--ink);cursor:pointer;text-decoration:underline;text-underline-offset:.2em}
+@keyframes pop{from{opacity:0;transform:translateY(8px)}}
+
+/* живое демо */
+.band{background:var(--steel)}
+.demo-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:20px}
+.demo-grid h2{margin-bottom:14px}
+.demo-sub{font-size:clamp(19px,1.5vw,22px);line-height:1.5;color:var(--ink-2);max-width:46ch}
+/* готовые вопросы: на телефоне — лента, листается вбок; на компьютере — столбик справа от чата */
+.demo-q h3{font-size:17px;margin-bottom:10px}
+.demo-q div{display:flex;flex-wrap:wrap;gap:8px}
+.demo-q button,.demo-chips button{min-height:44px;padding:8px 16px;border:1.5px solid var(--field);border-radius:var(--r);background:var(--paper);color:var(--ink);font-size:16px;font-weight:600;line-height:1.3;text-align:left;cursor:pointer}
+.demo-q button:hover,.demo-chips button:hover{border-color:var(--ink)}
+.demo-chips{display:flex;flex-wrap:wrap;gap:8px;align-self:flex-start} /* варианты ответа под сообщением ИИ — те же кнопки, что «Что можно спросить» */
+.demo-grid:has(.demo.call) .demo-q{display:none}
+@media(max-width:999px){.demo-side{display:contents}} /* без правой колонки: вопросы над чатом */
+@media(max-width:599px){
+  .demo-q div{flex-wrap:nowrap;overflow-x:auto;margin:0 -16px;padding:0 16px 2px;scrollbar-width:none}
+  .demo-q button{flex:none;white-space:nowrap}
+}
+@media(min-width:1000px){
+  .demo-grid{grid-template-columns:minmax(0,7fr) minmax(0,5fr);column-gap:56px;row-gap:40px;align-items:start}
+  .demo-head{grid-column:1/-1}
+  .demo{grid-column:1;grid-row:2;margin-top:0}
+  .demo-side{grid-column:2;grid-row:2}
+  .demo-q div{flex-direction:column;align-items:stretch}
+  .demo-q button{min-height:52px;padding:12px 18px}
+}
+.demo{background:var(--paper);border:1.5px solid var(--ink);border-radius:var(--r);overflow:hidden;margin-top:8px}
+.demo-top{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--rule);font-weight:700;font-size:16px}
+.demo-top::before{content:"";width:10px;height:10px;border-radius:50%;background:var(--line)}
+#demoMsgs{display:flex;flex-direction:column;gap:10px;min-height:240px;max-height:min(62vh,520px);overflow-y:auto;padding:18px;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:var(--field) transparent}
+.demo-msg{max-width:86%;padding:11px 15px;border-radius:14px;font-size:16px;line-height:1.45;white-space:pre-wrap;overflow-wrap:anywhere;animation:pop .35s cubic-bezier(.16,1,.3,1)}
+.demo-msg.bot{align-self:flex-start;background:var(--line);color:#fff;border-bottom-left-radius:4px}
+.demo-msg.user{align-self:flex-end;background:var(--steel);color:var(--ink);border-bottom-right-radius:4px}
+#demoForm{display:grid;grid-template-columns:minmax(0,1fr) 48px;gap:8px;padding:12px 12px 6px;border-top:1px solid var(--rule)}
+#demoInput{min-width:0;min-height:48px;padding:0 14px;border:1.5px solid var(--field);border-radius:var(--r);background:var(--paper);color:var(--ink);font-size:17px}
+#demoInput::placeholder{color:var(--ink-3)}
+#demoInput:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.send{display:grid;place-items:center;width:48px;height:48px;padding:0;cursor:pointer;position:relative}
+.send svg,#demoCall svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#demoCall{grid-column:1/-1}
+#demoCall[hidden]{display:none}
+#demoCall svg{transition:transform .2s}
+#demoCall.on{background:#C8231B}
+#demoCall.on:hover{background:#A51C15}
+#demoCall.on svg{transform:rotate(135deg)}
+.send{border:0;border-radius:var(--r);background:var(--line);color:#fff}
+.send:hover{background:var(--line-hover)}
+.send:disabled,#demoForm.busy .send{opacity:.45;cursor:not-allowed}
+.demo-msg.typing{opacity:.6}
+#demoStatus{grid-column:1/-1;min-height:22px;margin:0;font-size:14px;line-height:1.5;color:var(--ink-3)}
+/* карточка заявки в чате: человек сам проверяет данные и ставит галочку */
+.demo-lead{align-self:stretch;display:grid;gap:12px;padding:16px;border:2px solid var(--line);border-radius:var(--r);background:var(--paper);font-size:16px;line-height:1.45;animation:pop .35s cubic-bezier(.16,1,.3,1)}
+.demo-lead dl{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 12px;margin:0}
+.demo-lead dt{color:var(--ink-3)}
+.demo-lead dd{margin:0;font-weight:600;overflow-wrap:anywhere}
+.demo-lead .check{margin:0}
+.demo-lead .btn{min-height:48px;font-size:17px}
+.demo-lead .err,.demo-lead .small{margin:0}
+/* голосовой звонок: вместо переписки — шар, под ним состояние и кнопка */
+#demoOrb{display:none;width:clamp(240px,72vw,320px);aspect-ratio:1;margin:32px auto 12px}
+.demo.call #demoOrb{display:block}
+.demo.call #demoMsgs,.demo.call #demoInput,.demo.call .send{display:none}
+.demo.call #demoForm{border-top:0}
+.demo.call #demoStatus{order:-1;min-height:27px;text-align:center;font-size:18px;font-weight:600;color:var(--ink)}
+.demo-note{grid-column:1/-1;margin:0;font-size:13px;line-height:1.4;color:var(--ink-3);text-wrap:balance} /* на телефоне шире 13px не влезает — две ровные строки */
+.demo-note a{color:inherit}
+.demo-note.voice,.demo.call .demo-note{display:none}
+.demo.call .demo-note.voice{display:block;order:-1;text-align:center} /* под статусом звонка: у обоих order:-1, идут по порядку в разметке */
+
+/* где теряются */
+.pains-grid{display:grid}
+#pains{border-top:3px solid var(--ink)}
+.pain{display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:18px;padding:24px 0;border-bottom:1px solid var(--rule)}
+.pain .ico{grid-row:1/span 2;margin-top:-2px}
+.pain h3{font-size:clamp(20px,1.8vw,24px);margin-bottom:6px}
+.pain p{color:var(--ink-2)}
+.facts{display:grid;gap:18px;margin-top:32px}
+.facts p{display:grid;grid-template-columns:22px minmax(0,1fr);gap:12px;font-size:16px;line-height:1.5;color:var(--ink-2)}
+.facts .ico{width:22px;height:22px;color:var(--ink-3)}
+.facts a{color:var(--ink)}
+@media(min-width:1000px){
+  .pains-grid{grid-template-columns:minmax(0,5fr) minmax(0,7fr);grid-template-rows:auto 1fr;column-gap:64px;align-items:start}
+  .pains-grid h2{grid-column:1;grid-row:1}
+  #facts{grid-column:1;grid-row:2;margin-top:8px}
+  #pains{grid-column:2;grid-row:1/span 2}
+  .pain{grid-template-columns:44px minmax(0,1fr);padding:30px 0}
+}
+
+/* шаги: та же линия */
+.steps{display:grid;margin:8px 0 0;padding:0;list-style:none}
+.step{position:relative;padding:0 0 32px 64px;min-height:76px}
+.step:last-child{padding-bottom:0}
+.step .num{position:absolute;left:0;top:-4px;display:grid;place-items:center;width:44px;height:44px;border-radius:50%;background:var(--paper);box-shadow:inset 0 0 0 3px var(--line);font-size:19px;font-weight:800;font-variant-numeric:tabular-nums}
+.step:first-child .num{background:var(--line);color:#fff}
+.step:not(:last-child)::before{content:"";position:absolute;left:20.5px;top:40px;bottom:-4px;width:3px;background:var(--line)}
+.step p{color:var(--ink-2);font-size:17px;max-width:34ch}
+@media(min-width:860px){
+  .steps{grid-template-columns:repeat(4,minmax(0,1fr));column-gap:32px}
+  .step{padding:68px 0 0}
+  .step .num{top:0}
+  .step:not(:last-child)::before{left:44px;right:-32px;top:20.5px;bottom:auto;width:auto;height:3px}
+  .step p{font-size:16px}
+}
+.pair{display:grid;gap:40px;margin-top:64px;padding-top:32px;border-top:1px solid var(--rule)}
+@media(min-width:860px){.pair{grid-template-columns:1fr 1fr;gap:0;margin-top:88px}.pair>div+div{border-left:1px solid var(--rule);padding-left:56px}.pair>div:first-child{padding-right:56px}}
+.checks{list-style:none;margin:16px 0 0;padding:0;display:grid;gap:14px}
+.checks li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:14px;align-items:start}
+.checks li .ico{color:var(--line);margin-top:2px}
+.chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px 16px;margin:12px 0 20px}
+@media(min-width:480px){.chips{grid-template-columns:repeat(3,minmax(0,1fr))}}
+.chip{display:flex;align-items:center;gap:10px;min-height:44px;font-size:19px;font-weight:600}
+.chip::before{content:"";flex:none;width:14px;height:14px;border-radius:50%;box-shadow:inset 0 0 0 3px var(--line)}
+
+/* калькулятор — табло */
+.board{background:var(--board);color:var(--board-text)}
+.board h2{color:#fff}
+.calc{display:grid;gap:36px}
+@media(min-width:900px){.calc{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0}.calc>div:first-child{padding-right:56px;border-right:1px solid #343B47}.calc>div:last-child{padding-left:56px}}
+.field{display:block;margin-bottom:20px}
+.field span{display:block;font-size:16px;line-height:1.4;color:var(--ink-2);margin-bottom:8px}
+input[type=text],input[type=tel]{width:100%;min-height:56px;padding:0 18px;border:1.5px solid var(--field);border-radius:var(--r);background:var(--paper);color:var(--ink);font-size:17px;font-weight:400}
+input:focus{outline:none;border-color:var(--ink);box-shadow:0 0 0 1px var(--ink)}
+.board .range label{color:var(--board-muted)}
+.board .range output{color:#fff}
+.board input[type=range]:focus-visible{outline-color:#fff}
+.out{display:grid;align-content:start}
+.panel{padding:4px 0 28px}
+.panel+.panel{padding-top:28px;border-top:1px solid #343B47}
+.big{font-size:clamp(44px,5.2vw,80px);font-weight:800;letter-spacing:-.035em;line-height:1;font-variant-numeric:tabular-nums;margin-bottom:10px;overflow-wrap:anywhere}
+.loss .big{color:var(--board-loss)}.gain .big{color:var(--board-gain)}
+.panel p{font-size:18px;color:var(--board-text);max-width:36ch}
+.board .small{color:var(--board-muted);padding-top:20px;border-top:1px solid #343B47}
+
+/* разбор клиники: сначала цифры, под каждой — пара слов */
+.razbor{margin-top:32px;padding-top:28px;border-top:3px solid var(--ink)}
+.razbor h3+.stats{margin-top:16px}
+.razbor .stats+h3{margin-top:44px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px 16px}
+.stats>div{padding-top:14px;border-top:1px solid var(--rule)}
+.stats b{display:block;font-size:clamp(40px,4.4vw,64px);font-weight:800;letter-spacing:-.035em;line-height:1;color:var(--line);font-variant-numeric:tabular-nums;white-space:nowrap}
+.stats span{display:block;margin-top:8px;font-size:16px;line-height:1.35;color:var(--ink-2);text-wrap:pretty}
+.stats small{display:block;margin-top:4px;font-size:13px;line-height:1.35;color:var(--ink-3)}
+.stats .wide{grid-column:1/-1;display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:start}
+.stats .wide span{margin:0}
+.stats .wide .ico{color:var(--line)}
+.stats .x2,.stats .m2{grid-column:span 2} /* широкое число — на две колонки; m2 — только на телефоне, чтобы не висело одно */
+@media(min-width:860px){.stats{grid-template-columns:repeat(5,minmax(0,1fr));column-gap:24px}.stats .m2{grid-column:auto}}
+#razbor .btn{width:100%;margin-top:40px}
+@media(min-width:600px){#razbor .btn{width:auto}}
+
+/* ещё один менеджер или ИИ: те же цифры, что в разборе, пара на строку. Человек — серым, ИИ — цветом линии на белой колонке */
+.stats.vs{grid-template-columns:repeat(2,minmax(0,1fr));gap:0;border-top:3px solid var(--ink)}
+.vs>div{padding:14px 8px 22px 0}
+.vs>.ai{padding:14px 10px 22px 12px;background:var(--paper);border-left:3px solid var(--line)}
+.vs>:not(.ai) b{color:var(--ink-3)}
+.vs b{font-size:clamp(25px,8vw,64px)} /* растёт с шириной экрана: «50–80 тыс. ₽» и «от 80 000 ₽» в одну строку и на 320 */
+.vs b i{font-style:normal;font-size:.5em;font-weight:700;letter-spacing:-.01em} /* единица при числе — мельче: «80 000 ₽» влезает в колонку на 360 */
+.vs .h{border-top:0;font-size:min(19px,3.9vw);font-weight:700;line-height:1.3} /* «ИИ‑администратор» влезает в колонку целиком и на 360 */
+.vs .h.ai{color:var(--line)}
+@media(min-width:760px){.vs>div{padding:20px 24px 28px 0}.vs>.ai{padding:20px 16px 28px 32px}}
+/* не заменяет: заголовок и три коротких пункта */
+.keep{margin-top:56px}
+.keep ul{display:grid;margin:16px 0 0;padding:0;list-style:none;border-top:1px solid var(--rule)}
+.keep li{display:flex;align-items:center;gap:14px;padding:16px 0;border-bottom:1px solid var(--rule);font-size:18px;font-weight:600;line-height:1.35}
+.keep .ico{color:var(--line)}
+@media(min-width:760px){.keep ul{grid-template-columns:repeat(3,minmax(0,1fr));border-bottom:1px solid var(--rule)}.keep li{border-bottom:0;padding:20px 24px 20px 0}.keep li+li{padding-left:24px;border-left:1px solid var(--rule)}}
+
+/* сколько в месяц на работу нейросети: те же поля, только ползунки */
+.cost{display:grid;gap:28px;margin-top:56px;padding:24px 20px;border-radius:var(--r);background:var(--paper)}
+.cost h3{margin:0}
+.range{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;column-gap:12px;margin-bottom:20px}
+.range label{font-size:16px;line-height:1.4;color:var(--ink-2)}
+.range output{font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.range input,.range small{grid-column:1/-1}
+.range small{font-size:14px;line-height:1.4;color:var(--ink-3)}
+input[type=range]{display:block;width:100%;height:44px;margin:0;accent-color:var(--line);cursor:pointer}
+input[type=range]:focus{box-shadow:none}
+input[type=range]:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+.cost .big{font-size:clamp(44px,4.4vw,64px)}
+.cost .big small{font-size:clamp(20px,2.2vw,30px);font-weight:700;letter-spacing:-.01em;white-space:nowrap}
+#kParts{font-size:16px;line-height:1.5;color:var(--ink-2)}
+.cost .small{margin-top:20px;padding-top:16px;border-top:1px solid var(--rule)}
+@media(min-width:760px){.cost{padding:40px}}
+@media(min-width:900px){.cost{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:28px 0}.cost h3{grid-column:1/-1}.cost>div:nth-child(2){padding-right:48px;border-right:1px solid var(--rule)}.cost>div:last-child{padding-left:48px}}
+
+/* цены — прейскурант */
+.plans{border-top:3px solid var(--ink)}
+.plan{display:grid;gap:28px;padding:28px 0}
+.price-head{display:grid;grid-template-columns:36px minmax(0,1fr);column-gap:16px}
+.plan-buy .btn{width:100%;margin-top:28px}
+.plan-incl{padding-top:28px;border-top:1px solid var(--rule)}
+.plan-incl .checks{margin-top:14px}
+@media(min-width:600px){.plan-buy .btn{width:auto;margin-left:52px}}
+@media(min-width:860px){
+  .plan{grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:0;padding:44px 0 8px}
+  .plan-buy{padding-right:56px}
+  .plan-incl{padding:4px 0 0 56px;border-top:0;border-left:1px solid var(--rule)}
+}
+.price-head h3{margin:4px 0 6px}
+.price{font-size:clamp(44px,5vw,72px);font-weight:800;letter-spacing:-.035em;line-height:1;margin-bottom:8px;font-variant-numeric:tabular-nums}
+.price .from{font-size:clamp(20px,2.2vw,30px);font-weight:700;letter-spacing:-.01em;margin-right:.15em}
+.price-head .small{font-size:16px}
+.note{margin-top:16px}
+
+/* кто делает */
+.who{display:grid;gap:28px}
+.photo{aspect-ratio:4/5;width:100%;max-width:320px;border-radius:var(--r);overflow:hidden;background:var(--steel)}
+.photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 20%}
+.who p{font-size:clamp(19px,1.7vw,24px);line-height:1.5;margin-bottom:18px;max-width:36ch}
+.who p:last-child{margin-bottom:0}
+@media(min-width:860px){.who{grid-template-columns:minmax(0,4fr) minmax(0,7fr);gap:72px;align-items:end}.photo{max-width:none}}
+
+/* видео */
+.vid video{display:block;width:100%;aspect-ratio:16/9;border-radius:8px;background:var(--ink);object-fit:cover}
+.vid figcaption{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:6px 24px;margin-top:14px;font-size:16px;line-height:1.45;color:var(--ink-2)}
+.yt{display:inline-flex;align-items:center;gap:8px;min-height:44px;font-weight:600;color:var(--ink)}
+.yt svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* как это выглядит: плеер Kinescope, пропорции как у ролика 1592×1080 — без чёрных полос */
+.flowv{display:block;width:100%;aspect-ratio:1592/1080;border:0;border-radius:8px;background:var(--ink)}
+
+/* вопросы */
+.faq-grid{display:grid}
+.faq{border-top:3px solid var(--ink)}
+details{border-bottom:1px solid var(--rule)}
+summary{display:flex;justify-content:space-between;align-items:center;gap:16px;min-height:64px;padding:16px 0;font-weight:700;font-size:19px;line-height:1.35;cursor:pointer;list-style:none}
+summary::-webkit-details-marker{display:none}
+summary::after{content:"";flex:none;width:32px;height:32px;border-radius:50%;box-shadow:inset 0 0 0 2px var(--ink);background:linear-gradient(var(--ink),var(--ink)) center/12px 2px no-repeat,linear-gradient(var(--ink),var(--ink)) center/2px 12px no-repeat;transition:background-color .2s}
+details[open] summary::after{background:linear-gradient(#fff,#fff) center/12px 2px no-repeat,var(--ink)}
+summary:hover::after{background-color:var(--steel)}
+details[open] summary:hover::after{background-color:var(--ink)}
+details p{padding:0 48px 22px 0;color:var(--ink-2);max-width:62ch}
+@media(min-width:1000px){.faq-grid{grid-template-columns:minmax(0,5fr) minmax(0,7fr);column-gap:64px;align-items:start}.faq-grid h2{position:sticky;top:104px}}
+
+/* форма на поле цвета линии */
+.final{background:var(--line);color:#fff}
+.final :focus-visible{outline-color:#fff}
+.final .formcard :focus-visible{outline-color:var(--ink)}
+.final-grid{display:grid;gap:44px;align-items:start}
+@media(min-width:960px){.final-grid{grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:80px}}
+.formcard{background:var(--paper);color:var(--ink);border-radius:var(--r);padding:24px 20px;box-shadow:0 28px 56px -32px rgba(0,0,0,.55)}
+@media(min-width:760px){.formcard{padding:40px}}
+.formcard h2{margin-bottom:10px}
+.formcard .sub{color:var(--ink-2);margin-bottom:24px}
+.seg{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.seg label{position:relative;display:flex}
+.seg input{position:absolute;opacity:0;inset:0}
+.seg span{flex:1;display:flex;align-items:center;justify-content:center;min-height:52px;padding:0 6px;border:1.5px solid var(--field);border-radius:var(--r);background:var(--paper);font-weight:600;font-size:16px;color:var(--ink);cursor:pointer}
+.seg span:hover{border-color:var(--ink)}
+.seg input:checked+span{background:var(--ink);border-color:var(--ink);color:#fff}
+.seg input:focus-visible+span{outline:3px solid var(--ink);outline-offset:2px}
+.check{display:flex;gap:12px;align-items:flex-start;font-size:15px;line-height:1.45;color:var(--ink-2);margin:18px 0 22px}
+.check input{width:22px;height:22px;margin:1px 0 0;flex:none;accent-color:var(--line)}
+.formcard .btn{width:100%}
+.err{color:var(--loss);font-size:15px;margin-top:12px}
+.call{padding-top:8px}
+.call h3{font-size:clamp(24px,2.4vw,32px);letter-spacing:-.02em;margin-bottom:24px;color:#fff}
+.call .checks{gap:22px}
+.call .checks li .ico{color:#fff}
+.call .checks li b{display:block;font-size:19px}
+.call .checks li span{font-size:17px}
+
+.bar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:10px 16px calc(10px + env(safe-area-inset-bottom));background:var(--paper);border-top:1px solid var(--rule);transform:translateY(110%);transition:transform .25s cubic-bezier(.16,1,.3,1)}
+.bar.on{transform:none}.bar .btn{width:100%}
+@media(min-width:760px){.bar{display:none}}
+footer{padding:16px 0 96px;font-size:14px;color:var(--ink-3);border-top:1px solid var(--rule)}
+footer .wrap{display:flex;flex-wrap:wrap;justify-content:space-between;gap:4px 24px}
+footer .wrap>span{line-height:44px}
+footer a{display:inline-block;color:var(--ink-2);line-height:1.5;padding:12px 0;vertical-align:top}
+@media(min-width:760px){footer{padding-bottom:20px}}
+
+@media(prefers-reduced-motion:reduce){
+  .msg,.res,.demo-msg,.demo-lead{animation:none}
+  .stop::after,.stop::before,.st,.bar{transition:none}
+}
+</style>
+<!-- Yandex.Metrika counter -->
+<script>
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return;}}k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id=113550666','ym');
+ym(113550666,'init',{ssr:true,webvisor:true,clickmap:true,accurateTrackBounce:true,trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/113550666" style="position:absolute;left:-9999px" alt=""></div></noscript>
+<!-- /Yandex.Metrika counter -->
+<script src="demo.js?v=9" defer></script>
+</head>
+<body>
+<header class="top"><div class="wrap">
+  <div class="brand"><svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="7" fill="currentColor"/><path d="M22 8H10V24H20A4 4 0 0 0 20 16H10" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><circle cx="22" cy="8" r="4" fill="#fff"/></svg>Станислав Бугаев</div>
+  <a class="btn" href="#form">Бесплатный разбор</a>
+</div></header>
+
+<main>
+<section class="hero" id="hero"><div class="wrap hero-grid">
+  <h1 data-k="h1"></h1>
+  <div class="hero-copy">
+    <p class="lead" data-k="lead"></p>
+    <div class="ctas">
+      <a class="btn" href="#form">Получить бесплатный разбор</a>
+      <a class="btn ghost" href="#calc">Посчитать потери</a>
+    </div>
+    <p class="small">Перезвоню сам. Без навязчивых звонков.</p>
+  </div>
+  <div class="route-wrap">
+    <div class="route" id="flow" data-sw role="group" aria-label="Пример диалога ИИ-менеджера с клиентом">
+      <div class="stop"><div class="chat-head"><span data-k="chatWho"></span><small data-k="chatSrc"></small></div></div>
+      <div class="stop"><div class="chat-body" id="chatBody" aria-live="polite"></div></div>
+      <div class="stop"><div class="res" id="chatRes" hidden></div></div>
+    </div>
+    <div class="chat-meta"><span>Пример диалога. Компания вымышленная.</span><button class="linkbtn" id="replay" type="button">Показать снова</button></div>
+  </div>
+</div></section>
+
+<section class="s flush" id="look"><div class="wrap">
+  <h2>Как это выглядит</h2>
+  <iframe class="flowv" id="flowVideo" data-src="https://kinescope.io/embed/dvCPdCnYGfPf2JSZid4DE4" loading="lazy" allow="autoplay; fullscreen; picture-in-picture; encrypted-media" allowfullscreen title="Как ИИ-менеджер отвечает на заявку — видео"></iframe>
+</div></section>
+
+<section class="s band" id="live-demo"><div class="wrap demo-grid">
+  <div class="demo-head">
+    <h2>Спросите моего ИИ-менеджера</h2>
+    <p class="demo-sub">Это мой настоящий ИИ-менеджер. Он ответит на вопросы и запишет вас на бесплатный разбор. Так же он будет отвечать <span data-sw>вашим клиентам</span>.</p>
+  </div>
+  <div class="demo-side">
+    <div class="demo-q">
+      <h3>Что можно спросить</h3>
+      <div><button type="button">Сколько стоит внедрение?</button><button type="button">Как это работает с моей CRM?</button><button type="button">Сколько времени займёт запуск?</button><button type="button">Что будет на бесплатном разборе?</button><button type="button">Запишите меня на разбор</button></div>
+    </div>
+  </div>
+  <div class="demo">
+    <div class="demo-top">ИИ-менеджер Станислава</div>
+    <div id="demoMsgs" aria-live="polite">
+      <div class="demo-msg bot">Здравствуйте! Я ИИ-менеджер Станислава Бугаева. Что хотите узнать?</div>
+    </div>
+    <canvas id="demoOrb" aria-hidden="true"></canvas>
+    <form id="demoForm" autocomplete="off">
+      <input type="text" id="demoInput" placeholder="Напишите вопрос…" aria-label="Ваш вопрос" maxlength="500" enterkeyhint="send">
+      <button type="submit" class="send" id="demoSend" aria-label="Отправить"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg></button>
+      <p class="demo-note">Переписка сохраняется, чтобы ИИ отвечал лучше. <a href="politika.html" target="_blank">Подробнее</a></p>
+      <button type="button" class="btn" id="demoCall" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/></svg><span>Поговорить голосом</span></button>
+      <p id="demoStatus" role="status"></p>
+      <p class="demo-note voice">Разговор записывается текстом.</p>
+    </form>
+  </div>
+</div></section>
+
+<section class="s"><div class="wrap pains-grid">
+  <h2 data-k="painsH"></h2>
+  <div id="pains"></div>
+  <div class="facts" id="facts"></div>
+</div></section>
+
+<section class="s flush" id="steps" data-sw><div class="wrap">
+  <h2>Как я это делаю</h2>
+  <div class="steps">
+    <div class="step"><div class="num">1</div><h3>Разбор, 30–40 минут</h3><p>Смотрим, как вы сейчас отвечаете на заявки. Считаем потери. Бесплатно.</p></div>
+    <div class="step"><div class="num">2</div><h3>Учу ИИ-менеджера</h3><p>Собираю ваши ответы на частые вопросы, цены и условия. Вы проверяете.</p></div>
+    <div class="step"><div class="num">3</div><h3>Подключаю</h3><p>К сайту, мессенджерам и CRM. Проверяем на настоящих вопросах ваших клиентов.</p></div>
+    <div class="step"><div class="num">4</div><h3>Запускаю и слежу</h3><p>Первые две недели читаю все диалоги и правлю ответы.</p></div>
+  </div>
+  <div class="pair">
+    <div><h3>Чего ИИ-менеджер не делает</h3><ul class="checks" id="nots"></ul></div>
+    <div><h3>Где работает</h3><div class="chips" id="chips"></div><p class="muted" data-k="crm"></p></div>
+  </div>
+</div></section>
+
+<section class="s board" id="calc"><div class="wrap">
+  <h2>Посчитайте, сколько вы теряете</h2>
+  <div class="calc">
+    <div>
+      <div class="range"><label for="cLeads" data-k="leadsL"></label><output id="cLeadsV" for="cLeads"></output><input type="range" id="cLeads"></div>
+      <div class="range"><label for="cLate" data-k="lateL"></label><output id="cLateV" for="cLate"></output><input type="range" id="cLate"></div>
+      <div class="range"><label for="cBuy" data-k="buyL"></label><output id="cBuyV" for="cBuy"></output><input type="range" id="cBuy"></div>
+      <div class="range" style="margin:0"><label for="cCheck" data-k="checkL"></label><output id="cCheckV" for="cCheck"></output><input type="range" id="cCheck"></div>
+    </div>
+    <div class="out" aria-live="polite">
+      <div class="panel loss"><div class="big" id="cRisk">0 ₽</div><p data-k="riskL"></p></div>
+      <div class="panel gain"><div class="big" id="cSave">0 ₽</div><p data-sw>Если быстрый ответ спасёт хотя бы каждую пятую</p></div>
+      <p class="small">Это примерный расчёт по вашим цифрам, а не обещание. Точнее посчитаем на разборе.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="s" id="razbor"><div class="wrap">
+  <h2>Так выглядит бесплатный разбор</h2>
+  <p class="lead">Пример: частная клиника, 2026. Посмотрели таблицу звонков и посчитали.</p>
+  <div class="razbor">
+    <h3>Что увидели</h3>
+    <div class="stats">
+      <div><b>≈50</b><span>звонков в день</span></div>
+      <div><b>1</b><span>человек на телефоне в смене</span></div>
+      <div><b>&gt;50%</b><span>звонков пропущено в загруженные дни</span><small>44&nbsp;из&nbsp;85, 51&nbsp;из&nbsp;79, 63&nbsp;из&nbsp;91</small></div>
+      <div><b>0</b><span>перезвонов по пропущенным</span></div>
+      <div class="m2"><b>18:30</b><span>клиника закрывается, а звонят и в 22:00</span></div>
+    </div>
+    <h3>Что посчитали</h3>
+    <div class="stats">
+      <div class="x2"><b>400–600</b><span>человек в месяц не дозваниваются</span><small>не считая повторных звонков</small></div>
+      <div><b>80+</b><span>записей в месяц, если записать каждого пятого</span></div>
+      <div><b>≈31</b><span>пациент, чтобы вернуть 80&nbsp;000&nbsp;₽ за&nbsp;внедрение</span></div>
+      <div class="wide"><span class="ico" data-i="users"></span><span>Ещё один сотрудник закрыл бы только половину дней: смены идут по очереди. А вечером не отвечал бы никто.</span></div>
+    </div>
+  </div>
+  <a class="btn" href="#form" data-k="razborBtn"></a>
+</div></section>
+
+<section class="s band" id="hire"><div class="wrap">
+  <h2 data-k="vsH"></h2>
+  <p class="lead" data-k="vsLead"></p>
+  <div class="stats vs" id="vs"></div>
+  <div class="keep"><h3 data-k="keepH"></h3><ul id="keep"></ul></div>
+  <div class="cost" id="cost" data-sw>
+    <h3>Сколько в месяц на работу нейросети</h3>
+    <div>
+      <div class="range"><label for="kMin">Минут звонков в месяц</label><output id="kMinV" for="kMin"></output><input type="range" id="kMin" min="0" max="5000" step="100"><small>Сколько минут ИИ говорит с клиентами по телефону</small></div>
+      <div class="range" style="margin:0"><label for="kChats">Переписок в месяц</label><output id="kChatsV" for="kChats"></output><input type="range" id="kChats" min="0" max="3000" step="50"><small>Одна переписка — один разговор с клиентом, обычно 8–12 сообщений</small></div>
+    </div>
+    <div aria-live="polite">
+      <div class="big"><span id="kTotal">≈ 0 ₽</span> <small>в месяц</small></div>
+      <p id="kParts"></p>
+      <p class="small">Примерно, по текущим тарифам на октябрь 2026. Поддержка — отдельно, по объёму. Точную сумму посчитаю на разборе. Больше лимита не спишется.</p>
+    </div>
+  </div>
+</div></section>
+
+<section class="s" id="price"><div class="wrap">
+  <h2>Сколько стоит</h2>
+  <div class="plans">
+    <div class="plan">
+      <div class="plan-buy">
+        <div class="price-head"><span class="ico lg" data-i="gear"></span><div><h3>Внедрение</h3><div class="price"><span class="from">от</span> 80 000 ₽</div><div class="small">один раз, оплата по этапам</div></div></div>
+        <a class="btn" href="#form">Получить бесплатный разбор</a>
+      </div>
+      <div class="plan-incl">
+        <h3>Что входит</h3>
+        <ul class="checks" id="incl"></ul>
+        <p class="muted note">Работа нейросети — отдельной строкой и с жёстким лимитом в месяц. Больше лимита не спишется. <a href="#cost">Посчитать&nbsp;→</a></p>
+      </div>
+    </div>
+  </div>
+</div></section>
+
+<section class="s flush"><div class="wrap who">
+  <div class="photo"><img src="img/stanislav.jpg" alt="Станислав Бугаев" width="560" height="840" loading="lazy"></div>
+  <div>
+    <h2>Кто делает</h2>
+    <p><b>Станислав Бугаев.</b> Делаю ИИ-менеджеров для бизнеса и веду YouTube-канал про ИИ.</p>
+    <p>Работаю сам, без посредников. Вы общаетесь со мной от разбора до запуска.</p>
+    <p class="muted">Последний проект — ИИ-менеджер для международной компании. Отвечает клиентам на нескольких языках и сам заводит сделки в Битрикс24.</p>
+  </div>
+</div></section>
+
+<section class="s flush" id="video"><div class="wrap">
+  <h2>Как это работает в жизни</h2>
+  <figure class="vid">
+    <video id="demoVideo" controls playsinline preload="none" poster="video/demo.jpg"><source src="video/demo.mp4" type="video/mp4"></video>
+    <figcaption><span data-sw>Фрагмент ролика с моего YouTube-канала: ИИ-менеджер ведёт заявку стоматологии</span><a class="yt" href="https://www.youtube.com/watch?v=Tr_pokHo6Qk" target="_blank" rel="noopener">Смотреть полностью на YouTube<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M8 7h9v9"/></svg></a></figcaption>
+  </figure>
+</div></section>
+
+<section class="s flush" id="faq-s"><div class="wrap faq-grid">
+  <h2>Частые вопросы</h2>
+  <div class="faq" id="faq"></div>
+</div></section>
+
+<section class="s final" id="form"><div class="wrap final-grid">
+  <div class="formcard">
+    <h2>Бесплатный разбор</h2>
+    <p class="sub">Оставьте контакт. Я сам позвоню или напишу в тот же день.</p>
+    <form id="lead" novalidate>
+      <input type="text" name="website" tabindex="-1" autocomplete="off" aria-hidden="true" style="position:absolute;left:-9999px;width:1px;height:1px">
+      <label class="field"><span>Как вас зовут</span><input type="text" name="name" autocomplete="name" required maxlength="80"></label>
+      <div class="field">
+        <span id="viaL">Куда ответить</span>
+        <div class="seg" role="radiogroup" aria-labelledby="viaL">
+          <label><input type="radio" name="via" value="phone" checked><span>Телефон</span></label>
+          <label><input type="radio" name="via" value="telegram"><span>Telegram</span></label>
+          <label><input type="radio" name="via" value="max"><span>MAX</span></label>
+        </div>
+        <input type="tel" name="contact" id="contact" autocomplete="tel" required maxlength="40" placeholder="+7 900 000-00-00" aria-label="Телефон, Telegram или MAX">
+      </div>
+      <label class="check"><input type="checkbox" name="consent" required><span>Даю <a href="soglasie.html" target="_blank">согласие на обработку персональных данных</a></span></label>
+      <button class="btn" type="submit" id="send">Получить разбор</button>
+      <p class="err" id="err" hidden>Не получилось отправить. Напишите мне в Telegram: <a href="https://t.me/sstani_bgv" target="_blank" rel="noopener">@sstani_bgv</a> — отвечу сам.</p>
+    </form>
+    <div id="thanks" hidden>
+      <h3>Спасибо! Заявка у меня.</h3>
+      <p class="muted">Позвоню или напишу в тот же день. Чтобы разговор был полезным, прикиньте: сколько заявок у вас в месяц и откуда они приходят.</p>
+    </div>
+  </div>
+  <div class="call">
+    <h3>Что будет на разборе</h3>
+    <ul class="checks" id="callList"></ul>
+  </div>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <span>© 2026 Бугаев Станислав Львович · ИНН&nbsp;662104887145 · <a href="mailto:bugaev.stanislaw@gmail.com">bugaev.stanislaw@gmail.com</a></span>
+  <span><a href="politika.html">Политика обработки персональных данных</a> · <a href="soglasie.html">Согласие на обработку данных</a></span>
+</div></footer>
+
+<div class="bar" id="bar"><a class="btn" href="#form">Получить бесплатный разбор</a></div>
+
+<script>
+const LEAD_URL = '/api/lead'; // TODO: обработчик на сервере в РФ
+const YM_ID = 113550666;      // Метрика bugaev-ai.ru
+
+const ICONS = {
+  clock: '<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',
+  moon: '<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>',
+  inbox: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
+  users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  calc: '<rect width="16" height="20" x="4" y="2" rx="2"/><path d="M8 6h8M16 14v4M16 10h.01M12 10h.01M8 10h.01M12 14h.01M8 14h.01M12 18h.01M8 18h.01"/>',
+  phone: '<path d="m16 2 6 6M22 2l-6 6"/><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.8 19.8 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z"/>',
+  file: '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4M16 13H8M16 17H8M10 9H8"/>',
+  msg: '<path d="M7.9 20A9 9 0 1 0 4 16.1L2 22Z"/><path d="M8 12h.01M12 12h.01M16 12h.01"/>',
+  crm: '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><path d="m9 8 2 2 4-4"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  info: '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/>',
+  gear: '<path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><circle cx="12" cy="12" r="3"/>',
+};
+const icon = (k, size = '') => { const s = document.createElement('span'); s.className = 'ico ' + size; s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<svg viewBox="0 0 24 24">' + ICONS[k] + '</svg>'; return s; };
+
+const HBR = {t: 'Компании, которые отвечали на заявку в течение часа, почти в 7 раз чаще доходили до настоящего разговора с клиентом, чем те, кто отвечал позже.', src: 'Harvard Business Review, 2011', url: 'https://hbr.org/2011/03/the-short-life-of-online-sales-leads'};
+
+const SHARED = {
+  painsH: 'Где теряются клиенты',
+  chips: ['Сайт', 'WhatsApp', 'Telegram', 'ВКонтакте', 'MAX', 'Почта'],
+  crm: 'Передаёт заявки в вашу CRM: Битрикс24, amoCRM, GetCourse или самописную.',
+  nots: ['Не выдумывает. Если не знает ответа, передаёт вопрос менеджеру.', 'Не заменяет ваших продавцов. Берёт на себя первую минуту, вечер и выходные.', 'Не давит на клиента. Если человек просит живого менеджера, сразу зовёт его.'],
+  incl: ['Разбор и расчёт', 'Учу ИИ-менеджера на ваших ответах и ценах', 'Подключаю к сайту, мессенджерам и CRM', 'Две недели донастройки после запуска', 'Показываю ИИ-менеджера на ваших вопросах до основной оплаты'],
+  callList: [['Посмотрим, как сейчас', 'Откуда приходят заявки и как быстро вы на них отвечаете.'], ['Посчитаем потери', 'На ваших цифрах, а не на средних по рынку.'], ['Скажу честно', 'Нужен ли вам ИИ-менеджер. Если нет, так и скажу.']],
+  // Частые вопросы: faq (что спрашивают до покупки) → faqCrm (у клиник свой) → вопросы ниши → faqEnd. Видно первые 10, остальные по кнопке.
+  faq: [
+    ['Почему не нанять ещё одного менеджера?', 'Можно. Но человек работает 40 часов в неделю, болеет и уходит в отпуск. ИИ-менеджер отвечает за минуту днём и ночью, а ваш менеджер получает уже готовых покупателей.'],
+    ['Вы хотите заменить моих сотрудников?', 'Нет. Ваши люди работают как раньше. ИИ-менеджер берёт то, на что они не успевают: первую минуту, вечер, выходные и часы, когда все заняты.'],
+    ['Сейчас нет лишних денег. С чего начать?', 'Начните с одного шага. Например, ИИ отвечает только вечером и когда все заняты. Платите по этапам: следующий этап — только когда ИИ-менеджер прошёл проверку на ваших вопросах.'],
+    ['Сколько платить каждый месяц после запуска?', 'Две вещи. Работа нейросети — с жёстким лимитом, больше него не спишется. И поддержка: её цена зависит от того, сколько у вас заявок и каналов. Посчитаю её на разборе по вашим цифрам.'],
+    ['Как понять, что он окупается?', 'До запуска записываем, сколько заявок сейчас ждут ответа или теряются. После запуска в вашей CRM видно, скольким людям ответил ИИ и сколько из них стали заявками. Решаете по своим цифрам, а не по моим словам.'],
+  ],
+  faqCrm: ['У нас своя CRM, и мы как раз что-то меняем', 'Подключаю к тому, что у вас уже есть: Битрикс24, amoCRM, GetCourse или самописной. Новые программы ставить не нужно. Если CRM ещё не готова, заявки пока приходят вашему менеджеру в мессенджер.'],
+  faqEnd: [
+    ['Что нужно от нас? У нас даже ответы не собраны', 'Так почти у всех. Я задаю вопросы, вы отвечаете, а собираю всё в одно место я сам. От вас нужен один человек, который знает ответы.'],
+    ['Что если вопрос сложный или клиент недоволен?', 'ИИ-менеджер сразу передаёт разговор менеджеру вместе со всей перепиской. Так же, если клиент просит живого человека или вопроса нет в ваших ответах.'],
+    ['Заявка не потеряется? А если ИИ сломается?', 'Каждый разговор сразу попадает в вашу CRM, а менеджер получает уведомление. До запуска прогоняем тестовые заявки и проверяем, что всё доходит. Если ИИ сломается, сообщения клиентов сразу уходят вашим менеджерам. Клиент без ответа не останется.'],
+    ['Сколько времени займёт запуск?', 'Обычно 1–2 недели. Точный срок скажу на разборе, когда увижу ваши процессы.'],
+    ['Где хранятся данные клиентов?', 'Можно сделать так, чтобы всё хранилось на серверах в России. Как именно, решаем на разборе.'],
+  ],
+  // Ещё один менеджер или ИИ: первая строка — заголовки колонок, дальше пары [человек, ИИ] = [число, подпись, сноска?]. <i> — мелкая единица при числе
+  vsH: 'Ещё один менеджер или ИИ-менеджер',
+  vsLead: 'Когда заявок много, первая мысль — нанять ещё одного человека. Сравните.',
+  vs: [
+    ['Ещё один менеджер', 'ИИ-менеджер'],
+    [['50–80<i> тыс. ₽</i>', 'зарплата каждый месяц'], ['<i>от </i>80 000<i> ₽</i>', 'один раз', '+ нейросеть и поддержка каждый месяц — сумма ниже в расчёте']],
+    [['40<i> ч</i>', 'в неделю'], ['168<i> ч</i>', 'в неделю, без выходных']],
+    [['утром', 'ответ на вечернюю заявку'], ['1<i> мин</i>', 'ответ в любое время']],
+    [['1', 'клиент за раз'], ['много', 'клиентов сразу']],
+    [['28<i> дней</i>', 'отпуск в год + больничные'], ['0', 'больничных и отпусков']],
+    [['недели', 'найти и научить'], ['1–2<i> нед.</i>', 'до запуска']],
+  ],
+  // Источник зарплат (на странице не показываем): медиана нижней границы вилок, вакансии 22.09–08.10.2026 без Москвы (hh.ru ≈700 на роль, trudvsem.ru); пересчитать раз в полгода
+  keepH: 'ИИ-менеджер не заменяет ваших продавцов',
+  keep: [['clock', 'Отвечает сразу, даже ночью'], ['msg', 'Берёт одни и те же вопросы'], ['users', 'Передаёт вашему менеджеру готовых купить']],
+  costMin: 0, // минут звонков по умолчанию в «Сколько в месяц на работу нейросети»
+  razborBtn: 'Посчитать для моего бизнеса',
+};
+
+const NICHES = {
+  general: {
+    title: 'ИИ-менеджер для бизнеса — отвечает клиентам 24/7',
+    h1: 'Отвечает клиентам за минуту. Даже ночью и в выходные',
+    lead: 'Клиент пишет вам на сайт или в мессенджер. ИИ-менеджер сразу отвечает, узнаёт, что ему нужно, и передаёт готового покупателя вашему менеджеру.',
+    chatWho: 'Пример: студия натяжных потолков', chatSrc: 'Сообщение в Telegram · 22:40',
+    chat: [['c', 'Здравствуйте! Сколько стоит натяжной потолок?'], ['a', 'Добрый вечер! Зависит от размера комнаты. Сколько там метров? Нужна подсветка?'], ['c', '18 метров, без подсветки'], ['a', 'Выйдет примерно от 14 000 ₽ с установкой. Точную цену скажет замерщик, замер бесплатный. Когда удобно: завтра или в субботу?'], ['c', 'В субботу утром'], ['a', 'Записал на субботу, 10:00. Накануне напомню.']],
+    result: ['Записан на замер', 'Суббота, 10:00', 'Заявка уже в CRM, менеджер получил напоминание'],
+    flow: [['file', 'Заявка', '22:40'], ['msg', 'Ответ', '22:40'], ['crm', 'В CRM', 'сразу']],
+    pains: [['clock', 'Ответили через час — клиент ушёл', 'Человек пишет сразу в три компании. Покупает у тех, кто ответил первым.'], ['moon', 'Ночью и в выходные тишина', 'Люди пишут после работы. Менеджеры уже дома. Утром клиент уже нашёл других.'], ['inbox', 'Заявки теряются', 'Одна пришла на почту, другая в мессенджер, третья с сайта. Часть никто так и не увидел.']],
+    facts: [HBR],
+    calc: {leads: 200, late: 40, buy: 10, check: 30000, max: {leads: 2000, check: 500000}, leadsL: 'Сколько заявок у вас в месяц', lateL: 'Сколько из них ждут ответа дольше 15 минут, %', buyL: 'Сколько из 100 заявок обычно покупают', checkL: 'Сколько в среднем платит один клиент, ₽', riskL: 'Столько денег в месяц приносят заявки, которые ждут ответа'},
+    faq: [['Клиенты поймут, что это робот, и уйдут?', 'ИИ-менеджер пишет просто и по-человечески. Если клиент просит живого менеджера, он сразу передаёт разговор. И быстрый ответ лучше, чем ответ человека через три часа.'], ['А если он ответит неправильно?', 'Он отвечает только по вашим ответам и ценам. Если не знает, пишет «уточню у менеджера» и передаёт вопрос. До запуска проверяем его на ваших настоящих вопросах.']],
+  },
+  school: {
+    title: 'ИИ-менеджер для онлайн-школы — ответ на заявку за минуту',
+    desc: 'ИИ-менеджер для онлайн-школы: отвечает на заявки после вебинара за минуту, а не утром. Бесплатный разбор: посчитаем, сколько заявок вы теряете.',
+    h1: 'Заявки после вебинара получают ответ за минуту, а не утром',
+    lead: 'ИИ-менеджер сразу пишет каждому, кто оставил заявку. Отвечает про программу и рассрочку и передаёт готовых купить вашим менеджерам.',
+    chatWho: 'Пример: школа английского', chatSrc: 'Заявка после вебинара · 23:47',
+    chat: [['a', 'Добрый вечер, Марина! Вы оставили заявку после вебинара. Для чего вам английский: для работы, переезда или для себя?'], ['c', 'Для работы, у нас созвоны с иностранцами. А рассрочка есть?'], ['a', 'Есть, на 6 или 12 месяцев, оформляется онлайн за 5 минут. Для созвонов подойдёт курс «Деловой английский». Менеджер может завтра позвонить и подобрать группу. Удобно?'], ['c', 'Да, после 10'], ['a', 'Договорились. Менеджер позвонит завтра после 10:00.']],
+    result: ['Готова купить — передано менеджеру', 'Цель: английский для работы, рассрочка на 12 месяцев', 'Звонок менеджера завтра после 10:00'],
+    flow: [['file', 'Заявка', '23:47'], ['msg', 'Ответ', '23:47'], ['crm', 'В CRM', 'сразу']],
+    pains: [['clock', 'Заявки остывают', 'После вебинара приходят сотни заявок. Менеджеры добираются до них через несколько часов.'], ['moon', 'Вечером никто не отвечает', 'Вопросы про цену и рассрочку приходят вечером. Утром человек уже купил у другой школы.'], ['users', 'Менеджеры тратят время не на тех', 'Время уходит на тех, кто «просто посмотреть». А те, кто готов купить, ждут в очереди.']],
+    facts: [{t: 'GetCourse советует отвечать на заявку в первые 10–15 минут.', src: 'GetCourse', url: 'https://getcourse.ru/magazine/7-probelov-v-rabote-op'}, HBR],
+    calc: {leads: 600, late: 40, buy: 3, check: 45000, max: {leads: 5000, check: 300000}, leadsL: 'Сколько заявок у вас в месяц, вместе с вебинарами', lateL: 'Сколько из них ждут ответа дольше 15 минут, %', buyL: 'Сколько из 100 заявок обычно покупают', checkL: 'Сколько стоит ваш курс, ₽', riskL: 'Столько денег в месяц приносят заявки, которые ждут ответа'},
+    faq: [['ИИ не наврёт про программу и цены?', 'Он отвечает только по вашим материалам: программа, цены, рассрочка. Если ответа нет, пишет «уточню у менеджера» и передаёт вопрос. Первые две недели я сам читаю все диалоги и правлю ответы.'], ['Клиенты поймут, что это робот?', 'Он берёт на себя первую минуту после заявки и ночь. Тех, кто готов купить, сразу отдаёт менеджеру вместе с коротким пересказом разговора. Ответ сразу лучше, чем ответ утром.']],
+  },
+  opt: {
+    title: 'ИИ-менеджер для оптовой компании — ответ на заявку за минуту',
+    desc: 'ИИ-менеджер для оптовой компании: отвечает на заявки с сайта и почты за минуту, даже вечером. Бесплатный разбор: посчитаем, сколько заказов вы теряете.',
+    h1: 'Заявки с сайта получают ответ за минуту, даже вечером',
+    lead: 'ИИ-менеджер сразу отвечает клиенту, уточняет объём, сроки и доставку, считает примерную цену по вашему прайсу. Утром менеджер получает готовый заказ, а не пустую заявку.',
+    chatWho: 'Пример: поставщик кровли', chatSrc: 'Заявка с сайта · 19:42',
+    chat: [['c', 'Нужен профнастил, 200 квадратов. Сколько будет стоить?'], ['a', 'Добрый вечер! Подскажите, какая толщина и цвет? И куда доставить?'], ['c', 'С20, 0,5 мм, графит. В Казань, к пятнице'], ['a', 'По прайсу выходит около 112 000 ₽ без доставки. Доставку посчитает менеджер и пришлёт счёт завтра до 10:00. Куда отправить: на почту или сюда?'], ['c', 'На почту'], ['a', 'Хорошо. Счёт придёт завтра до 10:00.']],
+    result: ['Заказ передан менеджеру', 'Профнастил С20, 0,5 мм, графит, 200 м², доставка в Казань', 'Сделка в CRM, счёт до 10:00'],
+    flow: [['file', 'Заявка', '19:42'], ['msg', 'Ответ', '19:42'], ['crm', 'В CRM', 'сразу']],
+    pains: [['moon', 'Заявка ждёт до утра', 'Клиент написал вечером. Менеджер увидел заявку утром. Клиент уже получил цену у другого поставщика.'], ['calc', 'Менеджеры заняты рутиной', 'Узнать объём, сроки, доставку, посчитать по прайсу — это время. Его лучше тратить на крупных клиентов.'], ['inbox', 'Заявки теряются в почте', 'Одна пришла на почту, другая в мессенджер, третья с сайта. Часть так и не попадает в CRM.']],
+    facts: [{t: 'В промышленности и производстве почти половина обращений (46%) приходит на почту.', src: 'Callibri, 2025', url: 'https://callibri.ru/blog/issledovanie-promyshlennosti-i-proizvodstv-2025'}, HBR],
+    calc: {leads: 150, late: 30, buy: 15, check: 120000, max: {leads: 2000, check: 1000000}, leadsL: 'Сколько заявок у вас в месяц', lateL: 'Сколько из них ждут ответа дольше часа, %', buyL: 'Сколько из 100 заявок становятся заказом', checkL: 'Сколько в среднем стоит один заказ, ₽', riskL: 'Столько денег в месяц приносят заявки, которые ждут ответа'},
+    faq: [['ИИ ошибётся в цене?', 'Он считает только по вашему прайсу и всегда пишет «примерно». Точный счёт делает менеджер.'], ['Нашим клиентам нужен живой менеджер', 'Так и есть. ИИ-менеджер не ведёт переговоры. Он отвечает сразу, собирает всё для счёта и отдаёт клиента менеджеру. Клиент не ждёт до утра.']],
+  },
+  clinic: {
+    title: 'ИИ-администратор для клиники — пациенты не теряются',
+    desc: 'ИИ-администратор для клиники: отвечает пациентам, когда администратор занят или клиника закрыта. Бесплатный разбор: посчитаем, сколько записей вы теряете.',
+    h1: 'Администратор занят — пациенту отвечает ИИ. Даже ночью',
+    lead: 'ИИ-администратор берёт звонки и сообщения, когда ваши администраторы заняты или клиника закрыта. Записывает пациента и передаёт запись администратору.',
+    chatWho: 'Пример: стоматология', chatSrc: 'Звонок · 21:15 · клиника уже закрыта',
+    chat: [['c', 'Здравствуйте, хочу записаться к стоматологу, болит зуб'], ['a', 'Здравствуйте! Это виртуальный администратор клиники. Помогу записаться. Как вас зовут и когда удобно прийти?'], ['c', 'Марина. Завтра после обеда можно?'], ['a', 'Завтра есть 14:30 и 16:00. Какое время записать?'], ['c', '14:30'], ['a', 'Записала предварительно на завтра, 14:30. Утром администратор позвонит и подтвердит.']],
+    result: ['Пациент записан', 'Завтра, 14:30, стоматолог-терапевт', 'Заявка в CRM, администратор подтвердит утром'],
+    flow: [['phone', 'Звонок', '21:15'], ['msg', 'Ответ ИИ', 'сразу'], ['crm', 'Запись в CRM', '21:17']],
+    painsH: 'Где теряются пациенты',
+    chips: ['Телефон', 'Сайт', 'WhatsApp', 'Telegram', 'ВКонтакте', 'MAX'],
+    crm: 'Передаёт записи администратору и в вашу CRM или медицинскую программу (МИС), если её можно подключить.',
+    // Общие блоки (SHARED и элементы с data-sw) говорят про клинику: менеджер → администратор, клиент → пациент, заявки → записи
+    swap: [['готовых покупателей', 'готовые записи'], ['стали заявками', 'записались'], ['заявка не потеряется', 'запись не потеряется'], ['к сайту, мессенджерам и CRM', 'к телефону, сайту, мессенджерам и CRM'], ['каждую пятую', 'каждое пятое'], ['продавцов', 'администраторов'], ['менеджер', 'администратор'], ['клиент', 'пациент']],
+    pains: [['phone', 'Администратор не берёт трубку', 'Пока он говорит с одним пациентом, другие звонки уходят в пропущенные. А по пропущенным часто не перезванивают.'], ['moon', 'Вечером и в выходные тишина', 'Клиника закрылась, а пациенты звонят и пишут дальше. Утром они уже записались в другую клинику.'], ['users', 'Пациент не дозвонился и ушёл', 'Человек с болью не ждёт. Не дозвонился с первого раза — звонит в следующую клинику.']],
+    facts: [{t: 'Наш разбор частной клиники: в смене один администратор, в пиковые дни пропущено от 50 до 70% звонков, после 18:30 трубку не берёт никто.', src: 'разбор, 2026'}, {t: '70% обращений в клиники — это звонки.', src: 'Callibri, 2025', url: 'https://callibri.ru/blog/issledovanie-klientskih-obrashchenij-rynka-mediciny-2025'}],
+    calc: {leads: 1500, late: 30, buy: 50, check: 3000, max: {leads: 5000, check: 50000}, leadsL: 'Сколько звонков и сообщений у вас в месяц', lateL: 'Сколько из них остаются без ответа, %', buyL: 'Сколько из 100 обращений становятся записью', checkL: 'Сколько в среднем платит пациент за визит, ₽', riskL: 'Столько денег в месяц приносят обращения, которые остались без ответа'},
+    faq: [['Звонят не только записаться: перенос, отмена, вопросы', 'ИИ-администратор отвечает на обычные вопросы по вашим ответам: адрес, часы, подготовка к анализам. Если нужно перенести или отменить приём, он узнаёт, кто звонит и что нужно, и передаёт администратору.'], ['Пациенты говорят с акцентом или плохо говорят по-русски', 'ИИ переспрашивает и повторяет вслух главное: имя, телефон, время. До запуска проверяем его на записях ваших настоящих звонков. Если всё равно не понял, оставляет номер, и администратор перезванивает.'], ['А если пациенту плохо?', 'ИИ не даёт медицинских советов. При жалобах на сильную боль или опасные симптомы советует вызвать скорую и сразу сообщает администратору. Что именно он говорит в таких случаях, вы утверждаете до запуска.'], ['Пациенты не любят роботов', 'ИИ-администратор сразу говорит, что он виртуальный помощник, и по просьбе зовёт человека. Начинаем с того, где сейчас не отвечает никто: ночь, выходные и пропущенные звонки.'], ['Он не запишет не туда?', 'Он повторяет время и врача и записывает предварительно. Администратор подтверждает запись. Каждый разговор записан и виден в отчёте.']],
+    faqCrm: ['Он запишет прямо в нашу медицинскую программу?', 'ИИ записывает предварительно. Администратор подтверждает и ставит пациента в вашу программу, как обычно. Чтобы ИИ сам записывал в программу, её нужно подключить. Можно ли это с вашей программой, скажу на разборе.'],
+    vsH: 'Ещё один администратор или ИИ-администратор',
+    vsLead: 'Когда звонков много, первая мысль — нанять ещё одного администратора. Сравните.',
+    vs: [
+      ['Ещё один администратор', 'ИИ-администратор'],
+      [['45–65<i> тыс. ₽</i>', 'зарплата каждый месяц'], ['<i>от </i>80 000<i> ₽</i>', 'один раз', '+ нейросеть и поддержка каждый месяц — сумма ниже в расчёте']],
+      [['1<i> из 2</i>', 'дней — смены по очереди'], ['7<i> из 7</i>', 'дней в неделю']],
+      [['0', 'ответов после закрытия'], ['сразу', 'ответ даже ночью']],
+      [['1', 'пациент за раз'], ['много', 'пациентов сразу']],
+      [['28<i> дней</i>', 'отпуск в год + больничные'], ['0', 'больничных и отпусков']],
+    ],
+    keepH: 'ИИ-администратор не заменяет ваших людей',
+    keep: [['phone', 'Берёт звонки, когда все заняты'], ['moon', 'Работает каждый день, а не по сменам'], ['crm', 'Передаёт администратору готовые записи']],
+    costMin: 500,
+    razborBtn: 'Посчитать для моей клиники',
+  },
+};
+
+const $ = s => document.querySelector(s);
+const q = new URLSearchParams(location.search).get('n');
+const niche = Object.hasOwn(NICHES, q ?? '') ? q : 'general';
+const N = NICHES[niche];
+const swap = t => (N.swap || []).reduce((t, [a, b]) => t.replaceAll(a, b).replaceAll(a[0].toUpperCase() + a.slice(1), b[0].toUpperCase() + b.slice(1)), t);
+const S = JSON.parse(JSON.stringify(SHARED), (k, v) => typeof v === 'string' ? swap(v) : v);
+const d = {...S, ...N};
+d.faq = [...S.faq, d.faqCrm, ...N.faq, ...S.faqEnd];
+document.documentElement.dataset.n = niche;
+document.title = d.title;
+if (d.desc) $('meta[name=description]').content = d.desc; // у общей страницы — статичное описание из <head>
+const texts = {...d, ...d.calc};
+document.querySelectorAll('[data-k]').forEach(el => el.textContent = texts[el.dataset.k]);
+document.querySelectorAll('[data-i]').forEach(el => el.replaceWith(icon(el.dataset.i, 'lg')));
+
+// Неразрывные пробелы: «—», «%», «₽», «·» не начинают строку; «≈ 500», «80 000», «0,8–1,1» и «ИИ-менеджер» не рвутся
+const nb = t => t.replace(/ (?=[—%₽·])/g, '\u00a0').replace(/(≈|\d) (?=\d)/g, '$1\u00a0').replace(/(\d–)(?=\d)/g, '$1\u2060').replaceAll('ИИ-', 'ИИ\u2011');
+const eachText = (root, f) => { const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT); while (w.nextNode()) { const n = w.currentNode, v = f(n.data); if (v !== n.data) n.data = v; } };
+const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text) e.textContent = nb(text); return e; };
+const checkItem = (...nodes) => { const li = el('li'); const box = el('div'); box.append(...nodes); li.append(icon('check', 'sm'), box); return li; };
+// Станции маршрута: каждая встаёт в начало своей остановки (заявка, ответ, CRM)
+d.flow.forEach(([i, h, t], n) => {
+  const st = el('div', 'st'); st.append(icon(i), el('b', '', h), el('small', '', t)); $('#flow').children[n].prepend(st);
+});
+d.pains.forEach(([i, h, p]) => { const c = el('div', 'pain'); c.append(icon(i, 'lg'), el('h3', '', h), el('p', '', p)); $('#pains').append(c); });
+d.facts.forEach(f => { const p = el('p'), tx = el('span', '', f.t + ' — '); const a = el(f.url ? 'a' : 'span', '', f.src); if (f.url) { a.href = f.url; a.target = '_blank'; a.rel = 'noopener'; } tx.append(a); p.append(icon('info'), tx); $('#facts').append(p); });
+d.nots.forEach(t => $('#nots').append(checkItem(el('span', '', t))));
+d.chips.forEach(t => $('#chips').append(el('div', 'chip', t)));
+d.incl.forEach(t => $('#incl').append(checkItem(el('span', '', t))));
+d.callList.forEach(([b, t]) => $('#callList').append(checkItem(el('b', '', b), el('span', '', t))));
+d.faq.forEach(([q, a], i) => { const x = el('details'); x.hidden = i >= 10; x.append(el('summary', '', q), el('p', '', a)); $('#faq').append(x); });
+if (d.faq.length > 10) {
+  const more = el('button', 'linkbtn', 'Показать все вопросы'); more.type = 'button';
+  more.onclick = () => { const rest = $('#faq').querySelectorAll('details[hidden]'); rest.forEach(x => x.hidden = false); more.remove(); rest[0].querySelector('summary').focus(); };
+  $('#faq').append(more);
+}
+const vsCell = ([b, s, n], ai) => { const c = el('div', ai && 'ai'), x = el('b'); x.innerHTML = b; c.append(x, el('span', '', s)); if (n) c.append(el('small', '', n)); return c; };
+d.vs[0].forEach((t, i) => $('#vs').append(el('div', i ? 'h ai' : 'h', t)));
+d.vs.slice(1).forEach(([p, a]) => $('#vs').append(vsCell(p), vsCell(a, true)));
+d.keep.forEach(([i, t]) => { const li = el('li'); li.append(icon(i), t); $('#keep').append(li); });
+document.querySelectorAll('[data-sw]').forEach(e => { eachText(e, swap); const l = e.getAttribute('aria-label'); if (l) e.setAttribute('aria-label', swap(l)); });
+[$('main'), $('footer')].forEach(e => eachText(e, nb));
+
+// Демо-диалог: сообщения (.pre) и итог ([hidden]) сразу стоят на своих местах невидимыми и по очереди проявляются
+{ const [title, ...lines] = d.result, b = el('b'), ul = el('ul'); b.append(icon('check', 'sm'), nb(title)); lines.forEach(l => ul.append(el('li', '', l))); $('#chatRes').append(b, ul); }
+let timers = [];
+function playChat() {
+  timers.forEach(clearTimeout); timers = [];
+  const res = $('#chatRes'), msgs = d.chat.map(([, text]) => el('div', 'pre', text));
+  $('#chatBody').replaceChildren(...msgs); res.hidden = true;
+  const fast = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let t = 0;
+  d.chat.forEach(([who], i) => { t += fast ? 0 : (who === 'a' ? 1500 : 1100); timers.push(setTimeout(() => msgs[i].className = 'msg ' + who, t)); });
+  timers.push(setTimeout(() => res.hidden = false, t + (fast ? 0 : 900)));
+}
+playChat();
+$('#replay').onclick = playChat;
+
+// Калькулятор
+const num = id => Math.max(0, +$('#' + id).value || 0);
+const rub = v => Math.round(v).toLocaleString('ru-RU') + '\u00a0₽';
+const goal = g => { if (YM_ID && window.ym) ym(YM_ID, 'reachGoal', g); };
+// Ползунки ходят по лесенке: малые числа ставятся точно, большие — быстро. Значение ползунка — номер ступеньки. Верх лесенки — d.calc.max по нише.
+const ladder = (v, ...steps) => { const a = [v]; steps.forEach(([s, to]) => { while (v < to) a.push(v += s); }); return a; };
+const CALC = { // id ползунка: [ключ в d.calc, лесенка, как показать число]
+  cLeads: ['leads', ladder(0, [10, 100], [25, 500], [50, 1000], [100, 2000], [250, 5000]), v => v.toLocaleString('ru-RU')],
+  cLate: ['late', ladder(0, [5, 100]), v => v + '%'],
+  cBuy: ['buy', ladder(0, [1, 20], [5, 100]), String],
+  cCheck: ['check', ladder(500, [500, 5000], [1000, 20000], [5000, 100000], [10000, 300000], [50000, 1000000]), rub],
+};
+const cv = id => CALC[id][1][$('#' + id).value];
+let calcData = null, calcTimer, calcSent = false;
+function calc(touched) {
+  const [leads, late, buy, check] = Object.keys(CALC).map(cv);
+  const risk = leads * late / 100 * buy / 100 * check;
+  $('#cRisk').textContent = rub(risk);
+  $('#cSave').textContent = '+' + rub(risk / 5);
+  Object.entries(CALC).forEach(([id, [, , show]]) => { const t = show(cv(id)); $('#' + id + 'V').textContent = t; $('#' + id).setAttribute('aria-valuetext', t); });
+  if (touched) {
+    calcData = {leads, late, buy, check, risk: Math.round(risk)};
+    clearTimeout(calcTimer);
+    calcTimer = setTimeout(() => { if (YM_ID && window.ym) ym(YM_ID, 'params', {calc: {niche, ...calcData}}); if (!calcSent) { calcSent = true; goal('calc'); } }, 1500); // цифры — после каждой паузы, цель — один раз за просмотр
+  }
+}
+Object.entries(CALC).forEach(([id, [k, steps]]) => {
+  const s = CALC[id][1] = steps.filter(v => v <= (d.calc.max[k] ?? Infinity)), r = $('#' + id);
+  r.max = s.length - 1; r.value = s.findIndex(v => v >= d.calc[k]); r.oninput = () => calc(true);
+});
+calc(false);
+
+// Сколько в месяц на работу нейросети: звонок ≈ 8 ₽/мин (нейросеть и связь) + номер 500 ₽, если есть звонки; переписка ≈ 10 ₽.
+// Ставки: marketing/landing/running-costs.md и telephony-costs.md. Сумма всегда кратна 100: шаги ползунков 100 мин и 50 переписок.
+let costSent = false, costTimer;
+function cost(touched) {
+  const m = num('kMin'), c = num('kChats');
+  $('#kMinV').textContent = m.toLocaleString('ru-RU');
+  $('#kChatsV').textContent = c.toLocaleString('ru-RU');
+  const total = Math.ceil((m * 8 + (m > 0 ? 500 : 0) + c * 10) / 100) * 100;
+  $('#kTotal').textContent = nb('≈ ' + rub(total));
+  $('#kParts').textContent = nb([m && `звонки ≈ ${rub(m * 8)}`, m && 'номер ≈ 500 ₽', c && `переписки ≈ ${rub(c * 10)}`].filter(Boolean).join(' · '));
+  if (touched) {
+    if (!costSent) { costSent = true; goal('costcalc'); } // цель — один раз за просмотр
+    clearTimeout(costTimer);
+    costTimer = setTimeout(() => { if (YM_ID && window.ym) ym(YM_ID, 'params', {cost: {niche, min: m, chats: c, total}}); }, 1500); // цифры — после каждой паузы, как в калькуляторе потерь
+  }
+}
+$('#kMin').value = d.costMin; $('#kChats').value = 300;
+$('#kMin').oninput = $('#kChats').oninput = () => cost(true);
+cost(false);
+
+// Видео «Как это выглядит»: плеер грузится, когда его видно наполовину, и сразу играет без звука. Если просят меньше движения — без автозапуска.
+const flowVideo = $('#flowVideo');
+new IntersectionObserver(([x], o) => { if (!x.isIntersecting) return; o.disconnect(); flowVideo.src = flowVideo.dataset.src + (matchMedia('(prefers-reduced-motion: reduce)').matches ? '?playsinline=1' : '?autoplay=1&muted=1&playsinline=1'); }, {threshold: .5}).observe(flowVideo);
+
+// Форма
+const form = $('#lead'), contact = $('#contact');
+const VIA = {
+  phone: {type: 'tel', ac: 'tel', ph: '+7 900 000-00-00', ok: v => /^\+?[\d\s()-]{10,20}$/.test(v) && v.replace(/\D/g, '').length >= 10, msg: 'Проверьте номер телефона'},
+  telegram: {type: 'text', ac: 'off', ph: '@username или номер телефона', ok: v => /^@?[A-Za-z0-9_]{5,32}$/.test(v) || v.replace(/\D/g, '').length >= 10, msg: 'Напишите @username или номер'},
+  max: {type: 'tel', ac: 'tel', ph: 'Номер телефона в MAX', ok: v => /^\+?[\d\s()-]{10,20}$/.test(v) && v.replace(/\D/g, '').length >= 10, msg: 'Проверьте номер телефона'},
+};
+const via = () => form.via.value;
+// Отправка заявки: общая для этой формы и для карточки в чате с ИИ-менеджером (demo.js)
+window.sendLead = async data => {
+  const r = await fetch(LEAD_URL, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({niche, calc: calcData, page: location.href, ref: document.referrer, sid: window.demoSid, ...data})});
+  if (!r.ok) throw new Error(r.status);
+  if (data.source === 'chat' && YM_ID && window.ym) ym(YM_ID, 'params', {lead_source: 'chat'});
+  goal('lead');
+};
+form.querySelectorAll('[name=via]').forEach(r => r.onchange = () => { const c = VIA[via()]; contact.type = c.type; contact.autocomplete = c.ac; contact.placeholder = c.ph; contact.setCustomValidity(''); contact.focus(); });
+contact.oninput = () => contact.setCustomValidity('');
+form.onsubmit = async e => {
+  e.preventDefault();
+  const v = contact.value.trim();
+  contact.setCustomValidity(VIA[via()].ok(v) ? '' : VIA[via()].msg);
+  if (!form.reportValidity()) return;
+  const btn = $('#send'); btn.disabled = true; $('#err').hidden = true;
+  try {
+    await sendLead({name: form.name.value.trim(), via: via(), contact: v, consent: true, website: form.website.value});
+    form.hidden = true; $('#thanks').hidden = false;
+  } catch { $('#err').hidden = false; btn.disabled = false; }
+};
+
+// Нижняя кнопка на телефоне: видна между первым экраном и формой, но не над чатом — иначе закрывает поле ввода
+const seen = {hero: true, form: false, 'live-demo': false};
+const io = new IntersectionObserver(es => { es.forEach(x => seen[x.target.id] = x.isIntersecting); $('#bar').classList.toggle('on', !seen.hero && !seen.form && !seen['live-demo']); });
+io.observe($('#hero')); io.observe($('#form')); io.observe($('#live-demo'));
+
+// Прямая ссылка с #якорем (быстрые ссылки Директа): когда шрифты загрузились и вёрстка встала, ставим блок под шапку без анимации — если человек ещё сам не листал.
+// Плавная прокрутка (html.ready) включается только после этого.
+let moved = false;
+['wheel', 'touchstart', 'keydown'].forEach(e => addEventListener(e, () => moved = true, {once: true, passive: true}));
+addEventListener('load', () => document.fonts.ready.then(() => {
+  const t = location.hash && document.getElementById(location.hash.slice(1));
+  if (t && !moved) t.scrollIntoView();
+  document.documentElement.classList.add('ready');
+}));
+</script>
+</body>
+</html>
